@@ -11,7 +11,7 @@ const lowOrderQueue = [];
  */
 function choseQueueToSend() {
     if (highOrderQueue.length === 0)
-        sendRequestFrom(lowOrderQueue,  1);
+        sendRequestFrom(lowOrderQueue, 1);
     else
         sendRequestFrom(highOrderQueue, 1);
 }
@@ -33,8 +33,8 @@ function sendRequestFrom(queue, repeatTime = 5) {
         if (req.count > 1) {
             console.log(err, req.count);
             setTimeout(function () {
-                highOrderQueue.push(req); //ba vor el request chekav, es verji pushn exav?
-                choseQueueToSend(); //senc?
+                highOrderQueue.push(req);
+                choseQueueToSend();
             }, repeatTime * 1000)
         } else {
             //write about fail in DB
@@ -47,13 +47,11 @@ function sendRequestFrom(queue, repeatTime = 5) {
 function WebHooksContainer () {}
 
 /**
- * Handles incoming request,creats apropartiate webHooks and saves in a queue
+ * Asynchronously handles incoming request, creats apropartiate webHooks and saves them in a queue
  * @param tempBody Body of incoming request
  * @returns {Promise.<Array>} Queue containing webHooks
  */
 WebHooksContainer.prototype.register = async function(tempBody) {
-    //TODO: Hastat async a?
-    //hastat!
     const jsonBody = JSON.parse(tempBody);
     for (let url of jsonBody.urls) {
         lowOrderQueue.push({url, data: jsonBody.data});
