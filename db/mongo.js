@@ -1,6 +1,5 @@
 const  MongoClient = require('mongodb').MongoClient;
 
-
 let mongoDB = null;
 
 //use mongomongoDB with service/repository/interface pattern

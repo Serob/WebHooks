@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const webHooks = require('../utils/webHooksContainer')
-const CHUNK_SIZE = 10;
+const CHUNK_SIZE = require('../utils/envStore').chunk_size;
 
 router.post('/', function (req, res, next) {
-    const tempBody = JSON.stringify(req.body);
-    webHooks.register(tempBody).then(() =>
+    webHooks.register(req.body).then(() =>
         webHooks.sendBulkRequest(CHUNK_SIZE));
     return res.json({
         accepted: true,

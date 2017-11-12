@@ -1,11 +1,14 @@
 {
   "development": {
     "mongo":{
-      "mongoConnectionString": "mongodb://root:pass@localhost:27017/tngl?authSource=admin"
-    }
+      "mongoConnectionString": "mongodb://root:pass@localhost:27017/webhooks_log?authSource=admin"
+    },
+
+    "chunk_size" : 10
   },
 
   "production": {
-    "mongo":{ }
+    "mongo":{ },
+    "chunk_size" : 10
   }
 }
