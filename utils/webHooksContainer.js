@@ -1,6 +1,6 @@
 const express = require('express');
 const fakeRequest = require('../test/fakeRequest')
-var rp = require('request-promise');
+const rp = require('request-promise');
 
 //--------------- privates ------------------
 
@@ -10,23 +10,25 @@ const lowOrderQueue = [];
 /**
  * Chooses from which queue (higher/lower order) request have to be sent
  */
-function choseQueueToSend() {
+function sendRequestFromQueues(repeatTime = 5) {
     if (highOrderQueue.length === 0)
-        sendRequestFrom(lowOrderQueue, 1);
+        sendRequestFrom(lowOrderQueue, repeatTime);
     else
-        sendRequestFrom(highOrderQueue, 1);
+        sendRequestFrom(highOrderQueue, repeatTime);
 }
 
 function optionsCreator(req){
     return {
         uri: req.url,
+        method: 'POST',
         headers: {
             'content-type': 'application/json'
         },
         //or just body: req.data
         body: {
             data: req.data
-        }
+        },
+        json:true
     }
 }
 /**
@@ -39,16 +41,34 @@ function sendRequestFrom(queue, repeatTime = 5) {
     const db = require('../db/mongo').get();
     rp(optionsCreator(req))
         .then(parsedBody => {
-            console.log(parsedBody.status)
+            console.log(parsedBody.status);
+            if (highOrderQueue.length || lowOrderQueue.length) {
+                sendRequestFromQueues(repeatTime); //try another one
+            }
+            db.collection("success").insertOne(req).then( ()=>{
+                console.log("inserted as ok:", req.url);
+            })
         })
         .catch(function (err) {
-            console.log(err.statusCode)
+            req.count = req.count - 1 || 6;
+            if (req.count > 1) {
+                setTimeout(function () {
+                    highOrderQueue.push(req);
+                    sendRequestFromQueues(repeatTime);
+                }, repeatTime * 1000)
+            } else {
+                delete req.count;
+                req.responseStatus = err.statusCode;
+                db.collection("fail").insertOne(req).then( ()=>{
+                    console.log("inserted as fail:", req.url);
+                })
+            }
         });
 
 /*    fakeRequest(JSON.stringify(req)).then(response => {
         console.log(response.message);
         if (highOrderQueue.length || lowOrderQueue.length) {
-            choseQueueToSend(); //try another one
+            sendRequestFromQueues(); //try another one
         }
         db.collection("success").insertOne(req).then( ()=>{
             console.log("inserted as ok", req);
@@ -59,7 +79,7 @@ function sendRequestFrom(queue, repeatTime = 5) {
             //console.log(err, req.count);
             setTimeout(function () {
                 highOrderQueue.push(req);
-                choseQueueToSend();
+                sendRequestFromQueues();
             }, repeatTime * 1000)
         } else {
             delete req.count
@@ -93,7 +113,7 @@ WebHooksContainer.prototype.sendBulkRequest = function(bulkSize) {
     const requestsLeft = lowOrderQueue.length + highOrderQueue.length;
     const bulkLimit = requestsLeft > bulkSize ? bulkSize : requestsLeft;
     for (let i = 0; i < bulkLimit; i++) {
-        choseQueueToSend();
+        sendRequestFromQueues(1);
     }
 }
 
