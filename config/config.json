@@ -3,12 +3,17 @@
     "mongo":{
       "mongoConnectionString": "mongodb://root:pass@localhost:27017/webhooks_log?authSource=admin"
     },
-
-    "chunk_size" : 10
+    "webHooks": {
+        "chunkSize" : 10
+    }
   },
 
   "production": {
-    "mongo":{ },
-    "chunk_size" : 10
+    "mongo":{
+
+    },
+    "webHooks": {
+        "chunkSize" : 10
+    }
   }
 }

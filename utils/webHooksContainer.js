@@ -1,6 +1,9 @@
-const express = require('express');
+const debug = require('debug')('webhooks:server');
+const reqPromise = require('request-promise');
+
+/*For testing
 const fakeRequest = require('../test/fakeRequest')
-const rp = require('request-promise');
+ */
 
 //--------------- privates ------------------
 
@@ -9,14 +12,20 @@ const lowOrderQueue = [];
 
 /**
  * Chooses from which queue (higher/lower order) request have to be sent
+ * @param repeatTime Repeat time after sending failure (in seconds)
  */
-function sendRequestFromQueues(repeatTime = 5) {
+function sendRequestFromQueues(repeatTime = 10) {
     if (highOrderQueue.length === 0)
         sendRequestFrom(lowOrderQueue, repeatTime);
     else
         sendRequestFrom(highOrderQueue, repeatTime);
 }
 
+/**
+ * Creates oprions for making external request
+ * @param req The request based on which options are created
+ * @returns Object of request parameters (option)
+ */
 function optionsCreator(req){
     return {
         uri: req.url,
@@ -31,22 +40,22 @@ function optionsCreator(req){
         json:true
     }
 }
+
 /**
  * Send request form the provided queue
  * @param queue Provided queue of webHooks from which request should be sent: can be higher or lower order()
- * @param repeatTime Repeat time after failure (in seconds)
+ * @param repeatTime Repeat time after sending failure (in seconds)
  */
-function sendRequestFrom(queue, repeatTime = 5) {
+function sendRequestFrom(queue, repeatTime = 10) {
     const req = queue.shift();
     const db = require('../db/mongo').get();
-    rp(optionsCreator(req))
-        .then(parsedBody => {
-            console.log(parsedBody.status);
+    reqPromise(optionsCreator(req))
+        .then(respBody => {
             if (highOrderQueue.length || lowOrderQueue.length) {
                 sendRequestFromQueues(repeatTime); //try another one
             }
             db.collection("success").insertOne(req).then( ()=>{
-                console.log("inserted as ok:", req.url);
+                debug("inserted as ok:", req.url);
             })
         })
         .catch(function (err) {
@@ -60,34 +69,10 @@ function sendRequestFrom(queue, repeatTime = 5) {
                 delete req.count;
                 req.responseStatus = err.statusCode;
                 db.collection("fail").insertOne(req).then( ()=>{
-                    console.log("inserted as fail:", req.url);
+                    debug("Inserted as fail:", req.url);
                 })
             }
         });
-
-/*    fakeRequest(JSON.stringify(req)).then(response => {
-        console.log(response.message);
-        if (highOrderQueue.length || lowOrderQueue.length) {
-            sendRequestFromQueues(); //try another one
-        }
-        db.collection("success").insertOne(req).then( ()=>{
-            console.log("inserted as ok", req);
-        })
-    }).catch(err => {
-        req.count = req.count - 1 || 6;
-        if (req.count > 1) {
-            //console.log(err, req.count);
-            setTimeout(function () {
-                highOrderQueue.push(req);
-                sendRequestFromQueues();
-            }, repeatTime * 1000)
-        } else {
-            delete req.count
-            db.collection("fail").insertOne(req).then( ()=>{
-                console.log("inserted as fail", req);
-            })
-        }
-    });*/
 }
 
 //--------------- publics ------------------
