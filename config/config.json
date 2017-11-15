@@ -4,7 +4,8 @@
       "mongoConnectionString": "mongodb://root:pass@localhost:27017/webhooks_log?authSource=admin"
     },
     "webHooks": {
-        "chunkSize" : 10
+        "chunkSize" : 10,
+        "failRepeatCount": 5
     }
   },
 
@@ -13,7 +14,8 @@
 
     },
     "webHooks": {
-        "chunkSize" : 10
+        "chunkSize" : 10,
+        "failRepeatCount": 5
     }
   }
 }

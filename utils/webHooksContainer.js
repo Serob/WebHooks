@@ -1,5 +1,11 @@
 const debug = require('debug')('webhooks:server');
 const reqPromise = require('request-promise');
+const CHUNK_SIZE = require('../utils/envStore').chunkSize;
+const REPEAT_COUNT = require('../utils/envStore').failRepeatCount;
+
+const mongo = require('../db/mongo');
+
+let activeReqCount = 0;
 
 /*For testing
 const fakeRequest = require('../test/fakeRequest')
@@ -33,11 +39,11 @@ function optionsCreator(req){
         headers: {
             'content-type': 'application/json'
         },
-        //or just body: req.data
         body: {
             data: req.data
         },
-        json:true
+        timeout: 10000,
+        json: true
     }
 }
 
@@ -47,29 +53,36 @@ function optionsCreator(req){
  * @param repeatTime Repeat time after sending failure (in seconds)
  */
 function sendRequestFrom(queue, repeatTime = 10) {
+    const db = mongo.get();
+
     const req = queue.shift();
-    const db = require('../db/mongo').get();
+    activeReqCount++;
+
     reqPromise(optionsCreator(req))
         .then(respBody => {
+            activeReqCount--;
             if (highOrderQueue.length || lowOrderQueue.length) {
                 sendRequestFromQueues(repeatTime); //try another one
             }
-            db.collection("success").insertOne(req).then( ()=>{
-                debug("inserted as ok:", req.url);
+            db.collection("success").insertOne(req).then(() => {
+                debug("inserted as ok:", req.url); //console.log
             })
         })
-        .catch(function (err) {
-            req.count = req.count - 1 || 6;
+        .catch( err => {
+            activeReqCount--;
+            req.count = req.count - 1 || REPEAT_COUNT + 1;
             if (req.count > 1) {
-                setTimeout(function () {
+                setTimeout(() => {
                     highOrderQueue.push(req);
-                    sendRequestFromQueues(repeatTime);
+                    if (activeReqCount < CHUNK_SIZE) {
+                        sendRequestFromQueues(repeatTime);
+                    }
                 }, repeatTime * 1000)
             } else {
                 delete req.count;
                 req.responseStatus = err.statusCode;
-                db.collection("fail").insertOne(req).then( ()=>{
-                    debug("Inserted as fail:", req.url);
+                db.collection("fail").insertOne(req).then(() => {
+                    debug("Inserted as fail:", req.url); //console.log
                 })
             }
         });
@@ -94,11 +107,12 @@ WebHooksContainer.prototype.register = async function(jsonBody) {
  * Sends several(depending on bulkSize) reuests to appropriet URLs
  * @param bulkSize The size of simultaneously sent requests
  */
-WebHooksContainer.prototype.sendBulkRequest = function(bulkSize) {
+WebHooksContainer.prototype.sendBulkRequest = function() {
     const requestsLeft = lowOrderQueue.length + highOrderQueue.length;
-    const bulkLimit = requestsLeft > bulkSize ? bulkSize : requestsLeft;
-    for (let i = 0; i < bulkLimit; i++) {
-        sendRequestFromQueues(1);
+    const freeSpace = CHUNK_SIZE - activeReqCount;
+    const requestsToSend = Math.min(requestsLeft, freeSpace);
+    for (let i = 0; i < requestsToSend; i++) {
+        sendRequestFromQueues(REPEAT_COUNT);
     }
 }
 

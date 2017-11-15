@@ -21,6 +21,6 @@ There are two files in the *test* folder which can be used for testing purposes:
 ### Internal dependencies
 The project's structure is not sophisticated, but maybe the drawing of internal dependency tree can give some extra info))).
 
-<sub>*Coloured ones are utilities/globals*</sub>
+<sub>*Coloured ones are containers/globals*</sub>
 
 ![Alt text](https://image.ibb.co/m4Mvqw/Webhooks_dependency.png?raw=true "Dependency")
